@@ -1,51 +1,58 @@
-
 package controller;
 
 import org.springframework.http.MediaType;
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import javax.imageio.ImageIO;
-import javax.persistence.Convert;
-import java.awt.*;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
-import java.io.File;
 import java.io.IOException;
 
 @RestController
 public class HelloWorldController {
 
     @GetMapping("/")
-    public String hello() {
-        return "Hello World!!!";
+    public String HelloWorld(){
+        return "Hello World" ;
     }
 
-    @PostMapping("/")
-    public void convertToBlackAndWhite(File file, String newFileName) {
-        try {
+    @PostMapping(
+            path = "/" ,
+            consumes = {MediaType.IMAGE_PNG_VALUE , MediaType.IMAGE_JPEG_VALUE},
+            produces = {MediaType.IMAGE_JPEG_VALUE , MediaType.IMAGE_PNG_VALUE} )
 
-            final BufferedImage colorImage = ImageIO.read(file);
-
-            Graphics2D g = colorImage.createGraphics();
-            g.drawImage(colorImage, null, 0, 0);
-
-            final BufferedImage grayImage = new BufferedImage(colorImage.getWidth(), colorImage.getHeight(),
-                    BufferedImage.TYPE_BYTE_GRAY);
-            g = grayImage.createGraphics();
-            g.drawImage(colorImage, 0, 0, null);
-            g.dispose();
-
-            File output = new File("C:/Users/Whatever/Downloads/" + newFileName + ".jpg");
-            ImageIO.write(grayImage, "jpg", output);
-
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
+    public @ResponseBody byte[] postImage(@RequestBody byte[] image)throws IOException {
+        ByteArrayInputStream img = new ByteArrayInputStream(image);
+        return makeDarkMode(ImageIO.read(img));
     }
 
+    public static byte[] makeDarkMode(BufferedImage img) throws IOException {
+        byte[] bytes = new byte[0];
+        for (int x = 0; x < img.getWidth(); ++x)
+            for (int y = 0; y < img.getHeight(); ++y)
+            {
+                int rgb = img.getRGB(x, y);
+                int r = (rgb >> 16) & 0xFF;
+                int g = (rgb >> 8) & 0xFF;
+                int b = (rgb & 0xFF);
+
+                // Normalize and gamma correct:
+                double rr = Math.pow(r / 255.0, 2.2);
+                double gg = Math.pow(g / 255.0, 2.2);
+                double bb = Math.pow(b / 255.0, 2.2);
+
+                // Calculate luminance:
+                double lum = 0.2126 * rr + 0.7152 * gg + 0.0722 * bb;
+
+                // Gamma compand and rescale to byte range:
+                int grayLevel = (int) (255.0 * Math.pow(lum, 1.0 / 2.2));
+                int gray = (grayLevel << 16) + (grayLevel << 8) + grayLevel;
+                img.setRGB(x, y, gray);
+                ByteArrayOutputStream byteImage = new ByteArrayOutputStream();
+                ImageIO.write(img, "jpg", byteImage);
+                 bytes = byteImage.toByteArray() ;
+            }
+        return bytes ;
+    }
 }
